@@ -1,0 +1,80 @@
+
+#include <SPI.h>
+#include <MFRC522.h>
+
+#define RST_PIN 9
+#define SS_PIN 10
+
+MFRC522 mfrc522(SS_PIN, RST_PIN);
+MFRC522::MIFARE_Key key;
+byte cardData[1024];
+
+void setup() {
+  Serial.begin(115200);
+  SPI.begin();
+  mfrc522.PCD_Init();
+
+  for (byte i = 0; i < 6; i++) {
+    key.keyByte[i] = 0xFF;
+  }
+
+  Serial.println("Place the source card on the reader...");
+}
+
+void loop() {
+  if (!mfrc522.PICC_IsNewCardPresent() || !mfrc522.PICC_ReadCardSerial()) {
+    return;
+  }
+
+  Serial.println("Source card detected!");
+  readCardData();
+  mfrc522.PICC_HaltA();
+
+  Serial.println("Place the target card on the reader...");
+  while (!mfrc522.PICC_IsNewCardPresent() || !mfrc522.PICC_ReadCardSerial()) {
+    delay(100);
+  }
+
+  Serial.println("Target card detected!");
+  writeCardData();
+  mfrc522.PICC_HaltA();
+}
+
+bool readCardData() {
+  for (byte sector = 0; sector < 16; sector++) {
+    for (byte block = 0; block < 4; block++) {
+      byte blockNumber = sector * 4 + block;
+      if (mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, blockNumber, &key, &(mfrc522.uid)) != MFRC522::STATUS_OK) {
+        Serial.println("Authentication failed");
+        return false;
+      }
+      byte buffer[18];
+      byte size = sizeof(buffer);
+      if (mfrc522.MIFARE_Read(blockNumber, buffer, &size) != MFRC522::STATUS_OK) {
+        Serial.println("Reading failed");
+        return false;
+      }
+      memcpy(&cardData[blockNumber * 16], buffer, 16);
+    }
+  }
+  Serial.println("Source card data read successfully.");
+  return true;
+}
+
+bool writeCardData() {
+  for (byte sector = 0; sector < 16; sector++) {
+    for (byte block = 0; block < 4; block++) {
+      byte blockNumber = sector * 4 + block;
+      if (mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, blockNumber, &key, &(mfrc522.uid)) != MFRC522::STATUS_OK) {
+        Serial.println("Authentication failed");
+        return false;
+      }
+      if (mfrc522.MIFARE_Write(blockNumber, &cardData[blockNumber * 16], 16) != MFRC522::STATUS_OK) {
+        Serial.println("Writing failed");
+        return false;
+      }
+    }
+  }
+  Serial.println("Target card written successfully.");
+  return true;
+}
