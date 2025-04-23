@@ -1,0 +1,77 @@
+esphome:
+  name: rfid-reader
+  friendly_name: RFID Reader
+
+esp32:
+  board: esp32dev
+
+# Enable logging
+logger:
+  level: DEBUG
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "your HASS API key"
+
+ota:
+  - platform: esphome
+    password: "your esphome OTA password"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Esphome-Web Fallback Hotspot"
+    password: "your Fallback AP wifi"
+
+captive_portal:
+
+spi:
+  clk_pin: GPIO18
+  miso_pin: GPIO19
+  mosi_pin: GPIO23
+
+rc522_spi:
+  cs_pin: GPIO5
+  reset_pin: GPIO22
+  update_interval: 1s
+  on_tag:
+    then:
+      - homeassistant.tag_scanned: !lambda 'return x;'
+  on_tag_removed:
+    then:
+      - mqtt.publish:
+          topic: rc522/tag_removed
+          payload: !lambda 'return x;'
+
+text_sensor:
+  - platform: template
+    name: "RFID Tag ID"
+    id: tag_id
+
+mqtt:
+  broker: 192.168.10.136
+  username: "your_mqtt_user"
+  password: "your_mqtt_password"
+  topic_prefix: rfid-reader
+  discovery: true
+  discovery_prefix: homeassistant
+  log_topic: rfid-reader/debug
+
+binary_sensor:
+  - platform: rc522
+    uid: FF-FF-FF-FF
+    name: "Blue RC522 RFID Tag"
+  - platform: rc522
+    uid: FF-FF-FF-FF
+    name: "White RC522 RFID Card"
+
+# Example binary_sensor once you know a tag UID
+# You can get the UID from the console log of your ESPhome
+#binary_sensor:
+#  - platform: rc522
+#    uid: FF-FF-FF-FF
+#    name: "Blue RC522 RFID Tag"
